@@ -17,7 +17,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📦 Sales Order Pick List Generator v1.1")
+st.title("📦 Sales Order Pick List Generator v1.2.1")
 st.markdown("**Haven Cannabis** | Generate custom pick lists with input package tracking")
 
 # Initialize session state
@@ -155,7 +155,7 @@ def process_data(so_df, assembly_df, product_df=None):
                         float(units_per_case) > 0):
                         
                         calculated_cases = float(quantity) / float(units_per_case)
-                        # Round to 2 decimal places for display
+                        # Round to 2 decimal places for storage
                         cases.append(round(calculated_cases, 2))
                     else:
                         cases.append(None)  # Use None instead of empty string
@@ -264,6 +264,41 @@ def truncate_package_number(package_text):
         return str(package_text)
     return str(package_text)[-14:]
 
+def format_number_smart(value):
+    """
+    Format a number smartly - remove unnecessary decimals
+    1.0 -> "1", 1.5 -> "1.5", None -> ""
+    """
+    if value is None or pd.isna(value):
+        return ""
+    
+    try:
+        num = float(value)
+        # Check if it's a whole number
+        if num == int(num):
+            return str(int(num))
+        else:
+            # Round to 2 decimal places, remove trailing zeros
+            formatted = f"{num:.2f}".rstrip('0').rstrip('.')
+            return formatted
+    except (ValueError, TypeError):
+        return str(value)
+
+def is_partial_case(cases_value):
+    """
+    Check if cases value represents a partial case (has decimal component)
+    Returns True if there's a decimal portion > 0
+    """
+    if cases_value is None or pd.isna(cases_value):
+        return False
+    
+    try:
+        num = float(cases_value)
+        # Check if there's a fractional part
+        return num != int(num)
+    except (ValueError, TypeError):
+        return False
+
 def add_page_footer(canvas, doc, page_size, unique_customers, unique_sales_orders, unique_delivery_dates):
     """Add footer with page numbers, generation info, customer/SO/delivery date info on all pages"""
     canvas.saveState()
@@ -342,6 +377,7 @@ def generate_document_title(unique_customers, unique_sales_orders):
 def generate_pdf(df, selected_filters=None, hide_customer=False, hide_sales_order=False, portrait_mode=False):
     """
     Generate a styled PDF report with landscape or portrait orientation and custom color scheme
+    v1.2: Combined Qty/Cases column with partial case highlighting
     """
     # Create document title and file name based on data
     unique_customers = sorted(df['Customer'].unique())
@@ -376,6 +412,17 @@ def generate_pdf(df, selected_filters=None, hide_customer=False, hide_sales_orde
         spaceAfter=10
     )
     
+    # Custom style for combined Qty/Cases cell with tight line spacing
+    qty_combined_style = ParagraphStyle(
+        'QtyCombinedStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=1,  # Center
+        leading=13,   # Tighter line spacing (default is ~12 for size 10)
+        spaceBefore=0,
+        spaceAfter=0
+    )
+    
     elements = []
     
     # Add filter information in header if any
@@ -394,9 +441,6 @@ def generate_pdf(df, selected_filters=None, hide_customer=False, hide_sales_orde
             filter_para = Paragraph(filter_text, filter_style)
             elements.append(filter_para)
     
-    # Extract unique customers, sales orders, and delivery dates for footer (reuse from title generation)
-    # unique_customers and unique_sales_orders already extracted above for document title
-    
     # Extract unique delivery dates if the column exists
     unique_delivery_dates = []
     if 'Delivery_Date' in df.columns:
@@ -406,6 +450,7 @@ def generate_pdf(df, selected_filters=None, hide_customer=False, hide_sales_orde
             unique_delivery_dates = sorted(delivery_dates.unique())
     
     # Build headers and column widths based on visibility options and orientation
+    # NOTE: Combined Qty and Cases into single "Qty/Cases" column
     headers = []
     col_widths = []
     
@@ -417,49 +462,53 @@ def generate_pdf(df, selected_filters=None, hide_customer=False, hide_sales_orde
         headers.append('SO')
         col_widths.append(1*inch if not portrait_mode else 0.8*inch)
     
-    # Always include these columns
-    headers.extend(['Category', 'Product', 'Batch', 'Package', 'Qty', 'Cases'])
+    # Always include these columns - Note: Combined Qty/Cases column
+    headers.extend(['Category', 'Product', 'Batch', 'Package', 'Qty/Cases'])
     
     # Adjust column widths based on hidden columns and orientation
+    # Qty/Cases column needs to be wider to fit the combined content
     if portrait_mode:
         # Portrait mode - tighter spacing
         if hide_customer and hide_sales_order:
-            col_widths.extend([0.8*inch, 2.8*inch, 1*inch, 1*inch, 0.6*inch, 0.6*inch])
+            col_widths.extend([0.8*inch, 3.0*inch, 1*inch, 1*inch, 1.0*inch])
         elif hide_customer or hide_sales_order:
-            col_widths.extend([0.7*inch, 2.4*inch, 0.9*inch, 0.9*inch, 0.6*inch, 0.6*inch])
+            col_widths.extend([0.7*inch, 2.6*inch, 0.9*inch, 0.9*inch, 1.0*inch])
         else:
-            col_widths.extend([0.6*inch, 2.1*inch, 0.8*inch, 0.8*inch, 0.5*inch, 0.5*inch])
+            col_widths.extend([0.6*inch, 2.3*inch, 0.8*inch, 0.8*inch, 0.9*inch])
     else:
         # Landscape mode
         if hide_customer and hide_sales_order:
-            col_widths.extend([1.2*inch, 4.2*inch, 1.4*inch, 1.4*inch, 0.8*inch, 0.8*inch])
+            col_widths.extend([1.2*inch, 4.6*inch, 1.4*inch, 1.4*inch, 1.2*inch])
         elif hide_customer or hide_sales_order:
-            col_widths.extend([1.1*inch, 3.6*inch, 1.3*inch, 1.3*inch, 0.7*inch, 0.7*inch])
+            col_widths.extend([1.1*inch, 4.0*inch, 1.3*inch, 1.3*inch, 1.1*inch])
         else:
-            col_widths.extend([1*inch, 2.9*inch, 1.2*inch, 1.2*inch, 0.7*inch, 0.7*inch])
+            col_widths.extend([1*inch, 3.3*inch, 1.2*inch, 1.2*inch, 1.0*inch])
     
     # Prepare table data
     table_data = [headers]
     
-    for _, row in df.iterrows():
+    # Track which rows are partial cases (for highlighting)
+    partial_case_rows = []  # Will store row indices (1-based, since 0 is header)
+    
+    for row_idx, (_, row) in enumerate(df.iterrows()):
         # Handle None/NaN values for batch number
         batch_number = str(row['Batch_Number']) if pd.notna(row['Batch_Number']) and str(row['Batch_Number']).lower() != 'none' else ""
         
         # Determine product column width based on visibility settings and orientation
         if portrait_mode:
             if hide_customer and hide_sales_order:
-                product_width = 2.8  # Both hidden
+                product_width = 3.0  # Both hidden
             elif hide_customer or hide_sales_order:
-                product_width = 2.4  # One hidden
+                product_width = 2.6  # One hidden
             else:
-                product_width = 2.1  # None hidden
+                product_width = 2.3  # None hidden
         else:
             if hide_customer and hide_sales_order:
-                product_width = 4.2  # Both hidden
+                product_width = 4.6  # Both hidden
             elif hide_customer or hide_sales_order:
-                product_width = 3.6  # One hidden
+                product_width = 4.0  # One hidden
             else:
-                product_width = 2.9  # None hidden
+                product_width = 3.3  # None hidden
         
         # Process text fields with smart wrapping for product names
         product_name = wrap_text_smart(str(row['Product']), product_width, font_size=8)
@@ -467,8 +516,44 @@ def generate_pdf(df, selected_filters=None, hide_customer=False, hide_sales_orde
         batch_display = wrap_text(batch_number, 15) if batch_number else ""
         package_display = truncate_package_number(row['Input_Package_Number']) if pd.notna(row['Input_Package_Number']) else ""
         
-        # Handle Cases with wrapping
-        cases_display = wrap_text(str(row['Cases']), 8) if pd.notna(row['Cases']) and row['Cases'] != "" else ""
+        # Format Quantity and Cases with smart decimal handling
+        qty_formatted = format_number_smart(row['Quantity'])
+        cases_formatted = format_number_smart(row['Cases'])
+        
+        # Check if this is a partial case
+        is_partial = is_partial_case(row['Cases'])
+        
+        # Determine singular vs plural for Units and Cases
+        try:
+            qty_num = float(row['Quantity']) if pd.notna(row['Quantity']) else 0
+            unit_label = "Unit" if qty_num == 1 else "Units"
+        except:
+            unit_label = "Units"
+        
+        try:
+            cases_num = float(row['Cases']) if pd.notna(row['Cases']) else 0
+            case_label = "Case" if cases_num == 1 else "Cases"
+        except:
+            case_label = "Cases"
+        
+        # Build combined Qty/Cases cell content
+        # Units line: "X Units" - prominent, bold
+        # Cases line: "Y Cases" - slightly smaller, centered below, tighter spacing
+        if cases_formatted and cases_formatted != "":
+            if is_partial:
+                # Mark as partial case row for highlighting
+                partial_case_rows.append(row_idx + 1)  # +1 because row 0 is header
+                # Build combined text with PARTIAL indicator - tighter spacing with smaller line break
+                qty_cases_text = f"<b><font size='10'>{qty_formatted} {unit_label}</font></b><br/><font size='8' color='#991111'><b>{cases_formatted} {case_label} (PARTIAL)</b></font>"
+            else:
+                # Normal case - just show units and cases with tighter spacing
+                qty_cases_text = f"<b><font size='10'>{qty_formatted} {unit_label}</font></b><br/><font size='8' color='#555555'>{cases_formatted} {case_label}</font>"
+        else:
+            # No cases data - just show units
+            qty_cases_text = f"<b><font size='10'>{qty_formatted} {unit_label}</font></b>"
+        
+        # Create Paragraph for the combined Qty/Cases cell with tight spacing
+        qty_cases_para = Paragraph(qty_cases_text, qty_combined_style)
         
         # Build row data based on visibility options
         row_data = []
@@ -485,8 +570,7 @@ def generate_pdf(df, selected_filters=None, hide_customer=False, hide_sales_orde
             product_name,
             batch_display,
             package_display,
-            str(row['Quantity']),
-            cases_display
+            qty_cases_para  # Combined Qty/Cases as Paragraph
         ])
         
         table_data.append(row_data)
@@ -499,9 +583,12 @@ def generate_pdf(df, selected_filters=None, hide_customer=False, hide_sales_orde
     haven_gold = colors.Color(255/255, 202/255, 69/255)        # #FFCA45 - Haven gold accent  
     haven_purple = colors.Color(146/255, 39/255, 143/255)      # Haven purple (estimated)
     alt_row_color = colors.Color(248/255, 252/255, 253/255)    # Very light teal
-    border_color = colors.Color(0.6, 0.6, 0.6)                # Neutral gray for borders
+    border_color = colors.Color(0.6, 0.6, 0.6)                 # Neutral gray for borders
     
-    # Create table styles with Haven branding and proper vertical alignment
+    # Partial case highlight color - light orange/amber to stand out
+    partial_case_color = colors.Color(255/255, 243/255, 224/255)  # Light amber/orange #FFF3E0
+    
+    # Create base table styles with Haven branding and proper vertical alignment
     table_style = [
         # Header row - Haven teal branding
         ('BACKGROUND', (0, 0), (-1, 0), haven_teal),
@@ -517,15 +604,24 @@ def generate_pdf(df, selected_filters=None, hide_customer=False, hide_sales_orde
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('GRID', (0, 0), (-1, -1), 0.5, border_color),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, alt_row_color]),
         ('LEFTPADDING', (0, 0), (-1, -1), 8),
         ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-        ('TOPPADDING', (0, 1), (-1, -1), 12),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 12),
-        
-        # Ensure minimum row height for proper centering
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, alt_row_color]),
+        ('TOPPADDING', (0, 1), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 10),
     ]
+    
+    # Apply alternating row colors for non-partial rows
+    # We need to manually set backgrounds because partial rows override the alternating pattern
+    for row_num in range(1, len(table_data)):
+        if row_num in partial_case_rows:
+            # Partial case row - use amber highlight
+            table_style.append(('BACKGROUND', (0, row_num), (-1, row_num), partial_case_color))
+        else:
+            # Normal row - use alternating white/light teal
+            if (row_num - 1) % 2 == 0:  # Even data rows (0-indexed from data, not header)
+                table_style.append(('BACKGROUND', (0, row_num), (-1, row_num), colors.white))
+            else:
+                table_style.append(('BACKGROUND', (0, row_num), (-1, row_num), alt_row_color))
     
     table.setStyle(TableStyle(table_style))
     elements.append(table)
@@ -677,8 +773,15 @@ if st.session_state.processed_data is not None:
             filtered_df = filtered_df[filtered_df['Category'].isin(selected_categories)]
             applied_filters['Categories'] = selected_categories
         
+        # Show partial case indicator in the results preview
+        partial_count = filtered_df['Cases'].apply(is_partial_case).sum()
+        
         # Show filtered results
         st.subheader(f"📋 Pick List Results ({len(filtered_df):,} records)")
+        
+        if partial_count > 0:
+            st.warning(f"⚠️ **{partial_count} partial case(s)** detected - these will be highlighted in the PDF report")
+        
         st.dataframe(filtered_df, use_container_width=True)
         
         # Download section
@@ -739,13 +842,9 @@ if st.session_state.processed_data is not None:
         with col4:
             st.metric("🏷️ Categories", len(processed_df['Category'].unique()))
         with col5:
-            # Show cases calculation coverage if product data was loaded
-            if 'Cases' in processed_df.columns:
-                cases_coverage = processed_df['Cases'].notna().sum()
-                coverage_pct = (cases_coverage / len(processed_df) * 100) if len(processed_df) > 0 else 0
-                st.metric("📦 Cases Coverage", f"{coverage_pct:.0f}%")
-            else:
-                st.metric("📦 Cases Coverage", "0%")
+            # Show partial cases count
+            partial_total = processed_df['Cases'].apply(is_partial_case).sum()
+            st.metric("⚠️ Partial Cases", partial_total)
         
         # Show breakdown by category
         st.subheader("📈 Category Breakdown")
@@ -776,6 +875,12 @@ if st.session_state.processed_data is not None:
                         st.write(f"**Average Cases per Line:** {cases_numeric.mean():.2f}")
                         st.write(f"**Total Cases:** {cases_numeric.sum():.2f}")
                         st.write(f"**Largest Line:** {cases_numeric.max():.2f} cases")
+                        
+                        # Partial cases breakdown
+                        partial_cases = cases_numeric[cases_numeric != cases_numeric.astype(int)]
+                        full_cases = cases_numeric[cases_numeric == cases_numeric.astype(int)]
+                        st.write(f"**Full Cases:** {len(full_cases):,} lines")
+                        st.write(f"**Partial Cases:** {len(partial_cases):,} lines")
             
             with col2:
                 # Cases distribution
@@ -804,7 +909,7 @@ else:
             st.markdown("""
             **📋 Upload** → **🔄 Process** → **🎯 Filter** → **📥 Download**
             
-            **Haven Cannabis Pick List Generator v1.1** processes your sales order, assembly, and product data to create custom pick lists with input package tracking and calculated case requirements.
+            **Haven Cannabis Pick List Generator v1.2.1** processes your sales order, assembly, and product data to create custom pick lists with input package tracking and calculated case requirements.
             
             **Key Features:**
             - 🔗 Links Package Labels to Assembly Numbers
@@ -816,6 +921,13 @@ else:
             - 📋 Clean product-focused layout (Customer/SO columns optional)
             - 🗓️ Organized footer with generation time, customers, sales orders, and delivery dates
             - ✅ Auto-filters to Processing orders only
+            
+            **v1.2.1 Improvements:**
+            - ✨ Combined Qty/Cases into single column with Units prominent
+            - 🔢 Smart decimal formatting (no unnecessary ".0")
+            - ⚠️ Partial case highlighting with amber background
+            - 📝 Proper singular/plural (1 Unit vs 2 Units, 1 Case vs 2 Cases)
+            - 📐 Tighter, centered layout for Qty/Cases display
             """)
         
         with st.expander("📁 CSV File Requirements"):
