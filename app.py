@@ -649,6 +649,7 @@ def generate_pdf(df, selected_filters=None, hide_customer=False, hide_sales_orde
 # app stays a single file with no image asset to deploy. Streamlit scales an image
 # in a button label down to the height of the button text (about 16 pixels), so it
 # is stored here at 48px to stay sharp on high-resolution screens.
+# Artwork from Flaticon - credited in the "How it Works" panel on the welcome screen.
 SEPARATE_PDFS_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAMAAABg3Am1AAAAwFBMVEUAAAD19/n+4HwCAgD92nAYFQ3/6IJmaW4WFgmtjUTS2+nh5e4uMTVeYWU9PkEtIw/7zmMAAAD+94uYfDtpWS2umVX///9HSk8qIg4BAABGOhqah0t0YzINCQQAAABVRyXJqVeegT4BAQCZnaMXFQokHAm6pFvWvGllYVIHBgX/+XomKC92WCVvc3kpHg3cwWyNfUVHPiM9Qkt7fYOqqqrMzMzMmWZdY2lURB6AaDKutsB+gYc/Pz+ggz52fYQAAABCjll/AAAAQHRSTlMA/v75/v7+/iH+/v////8V/tT+/v7/Av7/jP7//jOp//7/cf4e/////07+/wj/GP//////AwUFUv/8/P8E/UkAZxVDUgAAAf5JREFUeNrNlmt3ojAQQEkmQEFtBbMEKK8taKmvdtvu+/H/f9ZOUkD07CZ87D1+UJzLTDJx0LLeLfvmaswx0ofnBVwQJI0mPoE48z6ckdnwMHz/+noefwff2TZ0zghZCQ/R50hxWQ9klD3FFzXZNtbV8fVPENydhGLN8HbP7jmL09uD7x8EFL+6+C8BpyuoiQbfJ6SGPscNrGh8jRf1EBEMwkcKLZkRLTPiBtFJiJ9rMdcifohiVFKJuyKuNQjcs74xUsj0i5b8hL6VqqQ5mRkgu5RDMyzaJUYWNrOTXlgL/2Wh5cUXccjVRsk1fFNnQQcGlOEt3AyLdk19cKEdCenOvIZdOgjTFu3CSFi3ZqFdj0uam4V5OhK4bRZsPhJWMDPFz1SYFI7gbSvwTYIP1daDo8qQZiWIg1uT2v0/AsosVRkK2eQYm9mGqa7XMgQKOZN+M0SOFupooIxS6kFiAafLJXPwE1PX/k0nhRwsWDEUqA680+M98shwY7sMesG5fxtumzADK0iNGVDZbCp8MedTYCU494wCdcIyjrnD4gQncYWCMQV94vzWWeL4y6VgToE5cL5XkMujNElQzZKnLwrM29Q7YSanQJHKNUwxcJPkuExsLGkpHTNqMOV40CdFM/w95G+PRO5NgkPSPRQDmMTpObdv8isjebN/p39K/gIDJjm2Rka6lwAAAABJRU5ErkJggg=="
 
 # Helper functions for generating one PDF per Sales Order (v1.3)
@@ -1102,6 +1103,9 @@ else:
             - ⚠️ Partial case highlighting with amber background
             - 📝 Proper singular/plural (1 Unit vs 2 Units, 1 Case vs 2 Cases)
             - 📐 Tighter, centered layout for Qty/Cases display
+
+            ---
+            *Folder icon on the "Generate Separate PDFs" button by [Flaticon](https://www.flaticon.com/).*
             """)
         
         with st.expander("📁 CSV File Requirements"):
