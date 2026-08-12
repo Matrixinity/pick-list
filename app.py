@@ -701,12 +701,26 @@ def generate_separate_pdfs_zip(df, selected_filters=None, hide_customer=False, h
         for index, sales_order in enumerate(sales_orders):
             # One Sales Order's rows out of the already-filtered data
             so_df = df[df['Order_Number'] == sales_order]
+            so_customers = sorted(so_df['Customer'].unique())
 
-            pdf_buffer = generate_pdf(so_df, selected_filters, hide_customer, hide_sales_order, portrait_mode)
+            # The line printed across the top of the PDF comes from selected_filters.
+            # Handing over the whole filter would print every selected store on every
+            # sheet ("Haven Belmont | Haven DTLB | Haven Paramount"), which the pickers
+            # read before they get to the store name in the footer. Narrow it to the
+            # store and order this particular sheet covers.
+            so_filters = None
+            if selected_filters:
+                so_filters = dict(selected_filters)  # copy - leave the caller's filters alone
+                if 'Customers' in so_filters:
+                    so_filters['Customers'] = so_customers
+                if 'Sales Orders' in so_filters:
+                    so_filters['Sales Orders'] = [str(sales_order)]
+
+            pdf_buffer = generate_pdf(so_df, so_filters, hide_customer, hide_sales_order, portrait_mode)
 
             # generate_document_title() returns "Pick List {Customer} {SO}" when handed
             # a single customer and a single order - exactly the name the pickers want
-            document_title = generate_document_title(sorted(so_df['Customer'].unique()), [sales_order])
+            document_title = generate_document_title(so_customers, [sales_order])
             filename = make_unique_filename(sanitize_filename(document_title) + ".pdf", used_filenames)
 
             zip_file.writestr(filename, pdf_buffer.getvalue())
