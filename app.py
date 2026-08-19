@@ -25,6 +25,10 @@ st.markdown("**Haven Cannabis** | Generate custom pick lists with input package 
 # Initialize session state
 if 'processed_data' not in st.session_state:
     st.session_state.processed_data = None
+# Re-stamped every time data is processed, so anything cached from an earlier upload
+# can tell that the data underneath it has been replaced
+if 'data_token' not in st.session_state:
+    st.session_state.data_token = None
 if 'so_data' not in st.session_state:
     st.session_state.so_data = None
 if 'assembly_data' not in st.session_state:
@@ -805,6 +809,8 @@ if st.sidebar.button("🚀 Process Data", type="primary", disabled=not (so_file 
             
             if processed_df is not None:
                 st.session_state.processed_data = processed_df
+                # New data makes anything generated from the old data stale
+                st.session_state.data_token = datetime.now().isoformat()
                 st.success(f"✅ Successfully processed {len(processed_df):,} records")
             else:
                 st.error("❌ Failed to process data. Please check your CSV file structure.")
@@ -940,9 +946,11 @@ if st.session_state.processed_data is not None:
                 st.button("📑 Download PDF Report", disabled=True, help="Click 'Generate PDF' button above first", use_container_width=True)
 
         # Separate PDFs section - one PDF per Sales Order, zipped together
-        # The filters and options are recorded alongside the ZIP. If either changes,
-        # the stored ZIP is dropped so we never quietly hand out stale pick lists.
-        separate_pdfs_signature = f"{applied_filters}|{show_customer}|{show_sales_order}|{landscape_mode}"
+        # The data, filters and options are all recorded alongside the ZIP. If any of
+        # them change, the stored ZIP is dropped so we never quietly hand out stale
+        # pick lists. The data token covers the case where the same filters are
+        # re-applied after a fresh upload, which would otherwise look unchanged.
+        separate_pdfs_signature = f"{st.session_state.data_token}|{applied_filters}|{show_customer}|{show_sales_order}|{landscape_mode}"
 
         if st.session_state.separate_pdfs_signature != separate_pdfs_signature:
             st.session_state.separate_pdfs_zip = None
